@@ -29,16 +29,12 @@ class DirectGSheetsConnection:
             "https://www.googleapis.com/auth/drive"
         ]
         
-        # If service_account.json exists in your repo root, load it directly
+        # Load directly from the service_account.json file in your repository root
         if os.path.exists("service_account.json"):
             creds = service_account.Credentials.from_service_account_file(
                 "service_account.json", 
-                scopes=scope,
-                default_claims={"exp": time.time() + 3600}
+                scopes=scope
             )
-            # Add clock skew tolerance to prevent invalid_grant timestamp drift errors
-            creds = creds.with_claims(clock_skew_in_seconds=60)
-            
             with open("service_account.json", "r") as f:
                 import json
                 file_info = json.load(f)
@@ -46,7 +42,6 @@ class DirectGSheetsConnection:
         else:
             sec = dict(secrets_dict)
             creds = service_account.Credentials.from_service_account_info(sec, scopes=scope)
-            creds = creds.with_claims(clock_skew_in_seconds=60)
             self.spreadsheet_url = sec.get("spreadsheet")
             
         self.client = gspread.authorize(creds)
