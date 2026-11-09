@@ -12,7 +12,7 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
 # ---------------------------------------------------------
-# 1. PAGE CONFIG
+# 1. PAGE CONFIG & CONNECTIONS
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="perFecto | Italian Luxury Tableware",
@@ -21,10 +21,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Initialize Google Sheets connection with your explicit spreadsheet URL
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1Tm4WKA4hZwhtE3Uz0FFEnNi8yUU3QkSP-DC5hFhGF2o/edit"
-# Initialize Google Sheets connection (reads from secrets)
+# Initialize Google Sheets connection (reads configuration from secrets)
 conn = st.connection("gsheets", type=GSheetsConnection)
+
 SERIAL_RE = re.compile(r"PER-\d{4}-\d{4}", re.IGNORECASE)
 EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 
@@ -117,7 +116,10 @@ def save_registration(serial, email, phone, email_sent):
             "email_sent": str(email_sent)
         }])
         
-        if df is not None:
+        expected_cols = ["timestamp", "serial", "email", "phone", "email_sent"]
+        if df is not None and not df.empty:
+            df = df.dropna(how="all", axis=1)
+            df = df[[c for c in expected_cols if c in df.columns]]
             updated_df = pd.concat([df, new_row], ignore_index=True)
         else:
             updated_df = new_row
@@ -136,7 +138,10 @@ def save_vip_email(email):
             "email": str(email)
         }])
         
-        if df is not None:
+        expected_cols = ["timestamp", "email"]
+        if df is not None and not df.empty:
+            df = df.dropna(how="all", axis=1)
+            df = df[[c for c in expected_cols if c in df.columns]]
             updated_df = pd.concat([df, new_row], ignore_index=True)
         else:
             updated_df = new_row
