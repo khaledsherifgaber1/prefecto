@@ -111,15 +111,21 @@ def save_registration(serial, email, phone, email_sent):
         df = conn.read(worksheet="registrations", ttl=0)
         new_row = pd.DataFrame([{
             "timestamp": datetime.now().isoformat(timespec="seconds"),
-            "serial": serial,
-            "email": email,
-            "phone": phone,
+            "serial": str(serial),
+            "email": str(email),
+            "phone": str(phone),
             "email_sent": str(email_sent)
         }])
+        
+        # Ensure exact columns match
+        expected_cols = ["timestamp", "serial", "email", "phone", "email_sent"]
         if df is not None and not df.empty:
+            # Drop unexpected columns if any exist
+            df = df[[c for c in expected_cols if c in df.columns]]
             updated_df = pd.concat([df, new_row], ignore_index=True)
         else:
             updated_df = new_row
+            
         conn.update(worksheet="registrations", data=updated_df)
     except Exception as e:
         st.error(f"Error saving registration to Google Sheets: {e}")
@@ -131,12 +137,17 @@ def save_vip_email(email):
         df = conn.read(worksheet="vip_list", ttl=0)
         new_row = pd.DataFrame([{
             "timestamp": datetime.now().isoformat(timespec="seconds"),
-            "email": email
+            "email": str(email)
         }])
+        
+        # Ensure exact columns match what's in the sheet
+        expected_cols = ["timestamp", "email"]
         if df is not None and not df.empty:
+            df = df[[c for c in expected_cols if c in df.columns]]
             updated_df = pd.concat([df, new_row], ignore_index=True)
         else:
             updated_df = new_row
+            
         conn.update(worksheet="vip_list", data=updated_df)
         return True
     except Exception as e:
