@@ -23,34 +23,26 @@ st.set_page_config(
 )
 
 class DirectGSheetsConnection:
-    def __init__(self, secrets_dict):
+    def __init__(self):
         scope = [
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/drive"
         ]
-        sec = dict(secrets_dict)
         
-        # If service_account.json exists in your project root, load it directly to completely bypass TOML/PEM errors
+        # Load directly from the uploaded service_account.json file in your repository
         if os.path.exists("service_account.json"):
             creds = service_account.Credentials.from_service_account_file("service_account.json", scopes=scope)
+            with open("service_account.json", "r") as f:
+                import json
+                file_info = json.load(f)
+                self.spreadsheet_url = file_info.get("spreadsheet") or st.secrets["connections"]["gsheets"]["spreadsheet"]
         else:
-            # Fallback handling for Base64 or standard secret strings
-            if "private_key_b64" in sec and sec["private_key_b64"]:
-                sec["private_key"] = base64.b64decode(sec["private_key_b64"]).decode("utf-8", errors="ignore")
-            else:
-                pk = sec.get("private_key", "")
-                if isinstance(pk, bytes):
-                    pk = pk.decode("utf-8", errors="ignore")
-                pk = pk.replace("\\n", "\n").strip()
-                if pk.startswith('"') and pk.endswith('"'):
-                    pk = pk[1:-1].strip()
-                if pk.startswith("'") and pk.endswith("'"):
-                    pk = pk[1:-1].strip()
-                sec["private_key"] = pk
+            # Fallback if secrets.toml is used
+            sec = dict(st.secrets["connections"]["gsheets"])
             creds = service_account.Credentials.from_service_account_info(sec, scopes=scope)
+            self.spreadsheet_url = sec.get("spreadsheet")
             
         self.client = gspread.authorize(creds)
-        self.spreadsheet_url = sec.get("spreadsheet")
         self.sh = self.client.open_by_url(self.spreadsheet_url)
 
     def read(self, worksheet: str, ttl=0):
@@ -72,7 +64,7 @@ class DirectGSheetsConnection:
 
 # Initialize robust direct connection
 try:
-    conn = DirectGSheetsConnection(st.secrets["connections"]["gsheets"])
+    conn = DirectGSheetsConnection()
 except Exception as e:
     st.error(f"Google Sheets connection error: {e}")
     conn = None
