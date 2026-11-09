@@ -23,22 +23,31 @@ st.set_page_config(
 )
 
 class DirectGSheetsConnection:
-    def __init__(self):
+    def __init__(self, secrets_dict):
         scope = [
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/drive"
         ]
         
-        # Load directly from the service_account.json file in your repository root
+        # If service_account.json exists in your repo root, load it directly
         if os.path.exists("service_account.json"):
-            creds = service_account.Credentials.from_service_account_file("service_account.json", scopes=scope)
+            creds = service_account.Credentials.from_service_account_file(
+                "service_account.json", 
+                scopes=scope,
+                default_claims={"exp": time.time() + 3600}
+            )
+            # Add clock skew tolerance to prevent invalid_grant timestamp drift errors
+            creds = creds.with_claims(clock_skew_in_seconds=60)
+            
             with open("service_account.json", "r") as f:
                 import json
                 file_info = json.load(f)
-                # You can store your spreadsheet URL directly inside service_account.json or replace the string below
                 self.spreadsheet_url = file_info.get("spreadsheet", "https://docs.google.com/spreadsheets/d/1Tm4WKA4hZwhtE3Uz0FFEnNi8yUU3QkSP-DC5hFhGF2o/edit")
         else:
-            raise FileNotFoundError("service_account.json not found in the project repository root.")
+            sec = dict(secrets_dict)
+            creds = service_account.Credentials.from_service_account_info(sec, scopes=scope)
+            creds = creds.with_claims(clock_skew_in_seconds=60)
+            self.spreadsheet_url = sec.get("spreadsheet")
             
         self.client = gspread.authorize(creds)
         self.sh = self.client.open_by_url(self.spreadsheet_url)
@@ -60,9 +69,9 @@ class DirectGSheetsConnection:
         df_clean = data.fillna("")
         ws.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
 
-# Initialize robust direct connection using the JSON file
+# Initialize robust direct connection
 try:
-    conn = DirectGSheetsConnection()
+    conn = DirectGSheetsConnection(st.secrets["connections"]["gsheets"] if "connections" in st.secrets else {})
 except Exception as e:
     st.error(f"Google Sheets connection error: {e}")
     conn = None
