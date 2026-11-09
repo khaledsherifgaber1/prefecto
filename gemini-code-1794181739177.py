@@ -117,11 +117,7 @@ def save_registration(serial, email, phone, email_sent):
             "email_sent": str(email_sent)
         }])
         
-        # Ensure exact columns match
-        expected_cols = ["timestamp", "serial", "email", "phone", "email_sent"]
-        if df is not None and not df.empty:
-            # Drop unexpected columns if any exist
-            df = df[[c for c in expected_cols if c in df.columns]]
+        if df is not None:
             updated_df = pd.concat([df, new_row], ignore_index=True)
         else:
             updated_df = new_row
@@ -140,10 +136,7 @@ def save_vip_email(email):
             "email": str(email)
         }])
         
-        # Ensure exact columns match what's in the sheet
-        expected_cols = ["timestamp", "email"]
-        if df is not None and not df.empty:
-            df = df[[c for c in expected_cols if c in df.columns]]
+        if df is not None:
             updated_df = pd.concat([df, new_row], ignore_index=True)
         else:
             updated_df = new_row
