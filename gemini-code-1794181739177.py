@@ -3,73 +3,61 @@ import time
 import os
 
 # ---------------------------------------------------------
-# 1. PAGE CONFIGURATION
+# 1. PAGE CONFIG
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="perFecto | Luxury Tableware",
+    page_title="perFecto | Luxury Home",
     page_icon="🍽️",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # ---------------------------------------------------------
-# 2. EXACT DESIGN CSS STYLING
+# 2. STYLING (Fixed CSS & Typography)
 # ---------------------------------------------------------
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Montserrat:wght@300;400;500;600;700&display=swap');
 
-    /* Global Page Styling */
     .stApp {
         background-color: #F8F9FA;
-        color: #212529;
+        color: #1A1A1A;
         font-family: 'Montserrat', sans-serif;
     }
-    
-    /* Top Navigation Bar */
-    .top-nav {
+
+    /* Top Nav */
+    .nav-bar {
         display: flex;
         justify-content: flex-end;
-        align-items: center;
-        gap: 30px;
-        padding: 10px 20px 20px 20px;
-        border-bottom: 1px solid #E9ECEF;
-        margin-bottom: 30px;
-    }
-    .nav-item {
-        text-align: center;
-        color: #495057;
-        font-size: 0.8rem;
+        gap: 25px;
+        padding: 5px 10px 20px 10px;
+        border-bottom: 1px solid #E5E7EB;
+        margin-bottom: 25px;
+        font-size: 0.85rem;
         font-weight: 500;
-        cursor: pointer;
-    }
-    .nav-icon {
-        font-size: 1.2rem;
-        display: block;
-        margin-bottom: 2px;
+        color: #4B5563;
     }
 
-    /* Left Navy Hero Banner */
-    .navy-hero {
-        background: linear-gradient(180deg, #0A1B3A 0%, #061126 100%);
-        border-radius: 4px;
-        padding: 45px 35px;
+    /* Navy Sidebar Card */
+    .hero-card {
+        background: linear-gradient(180deg, #0A1B3A 0%, #050E1E 100%);
+        border-radius: 8px;
+        padding: 40px 30px;
         color: #FFFFFF;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-        position: relative;
-        overflow: hidden;
-        min-height: 680px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        min-height: 620px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
     }
 
-    /* Brand Logo Text */
-    .brand-title {
-        font-size: 2.8rem;
+    /* Brand Logo */
+    .brand-logo {
+        font-size: 2.6rem;
         font-weight: 800;
-        margin-bottom: 0;
+        margin-bottom: 0px;
         line-height: 1;
+        letter-spacing: -0.5px;
     }
     .brand-per { color: #FF3333; }
     .brand-f   { color: #FFFFFF; }
@@ -77,97 +65,74 @@ st.markdown("""
     .brand-sub {
         letter-spacing: 5px;
         font-size: 0.75rem;
-        color: #CCCCCC;
-        margin-top: 4px;
+        color: #9CA3AF;
+        margin-top: 6px;
         font-weight: 500;
     }
 
-    /* Hero Headline */
-    .hero-heading {
+    /* Headings */
+    .hero-title {
         font-family: 'Playfair Display', serif;
-        font-size: 2.4rem;
+        font-size: 2.3rem;
         font-weight: 700;
-        line-height: 1.25;
-        letter-spacing: 1px;
-        margin-top: 40px;
+        line-height: 1.2;
+        margin-top: 35px;
         margin-bottom: 15px;
         color: #FFFFFF;
+        letter-spacing: 1px;
     }
-    .hero-sub {
-        font-size: 1rem;
+    .hero-text {
+        font-size: 0.95rem;
         color: #D1D5DB;
         margin-bottom: 30px;
         font-weight: 300;
     }
 
-    /* CTA Button inside Hero */
-    .hero-cta {
-        display: inline-block;
-        background-color: #FFFFFF;
-        color: #0A1B3A;
-        font-family: 'Montserrat', sans-serif;
-        font-weight: 700;
-        font-size: 0.8rem;
-        letter-spacing: 1.5px;
-        padding: 12px 24px;
-        border-radius: 4px;
-        text-transform: uppercase;
-        border: none;
-        text-align: center;
-    }
-
-    /* Italian Architectural Motif Styling */
-    .landmark-watermark {
-        margin-top: 40px;
-        opacity: 0.35;
-        border-top: 1px solid rgba(255,255,255,0.15);
-        padding-top: 20px;
-        text-align: center;
-    }
-
-    /* Product Specification Callouts */
-    .spec-callout {
+    /* Specification Cards */
+    .spec-box {
         background: #FFFFFF;
         border-left: 4px solid #0A1B3A;
-        padding: 15px 20px;
-        border-radius: 4px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        padding: 16px 20px;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         margin-bottom: 15px;
+        border-top: 1px solid #F3F4F6;
+        border-right: 1px solid #F3F4F6;
+        border-bottom: 1px solid #F3F4F6;
     }
-    .spec-title {
-        font-size: 1.1rem;
+    .spec-h {
+        font-size: 1.05rem;
         font-weight: 700;
         color: #0A1B3A;
-        margin-bottom: 2px;
     }
-    .spec-desc {
-        font-size: 0.85rem;
-        color: #6C757D;
+    .spec-p {
+        font-size: 0.82rem;
+        color: #6B7280;
+        margin-top: 2px;
     }
 
-    /* Interactive Sections (Authenticity & Teaser) */
-    .section-card {
+    /* Feature Section Containers */
+    .feature-card {
         background: #FFFFFF;
         border-radius: 8px;
-        padding: 25px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        margin-top: 25px;
-        border: 1px solid #E9ECEF;
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+        border: 1px solid #E5E7EB;
+        margin-top: 20px;
     }
 
-    /* Streamlit Overrides */
+    /* Streamlit Input & Button Styling */
     .stButton>button {
         background-color: #0A1B3A !important;
         color: #FFFFFF !important;
         font-weight: 600 !important;
         border-radius: 4px !important;
-        padding: 0.6rem 1.5rem !important;
+        padding: 0.55rem 1.2rem !important;
         width: 100%;
         border: none !important;
     }
     .stButton>button:hover {
         background-color: #00A859 !important;
-        color: #FFFFFF !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -176,121 +141,109 @@ st.markdown("""
 # 3. TOP NAVIGATION BAR
 # ---------------------------------------------------------
 st.markdown("""
-<div class="top-nav">
-    <div class="nav-item"><span class="nav-icon">🏠</span>Home</div>
-    <div class="nav-item"><span class="nav-icon">㗊</span>Range</div>
-    <div class="nav-item"><span class="nav-icon">ℹ️</span>About</div>
-    <div class="nav-item"><span class="nav-icon">🛒</span>Cart</div>
-    <div class="nav-item"><span class="nav-icon">👤</span>Profile</div>
+<div class="nav-bar">
+    <div>🏠 Home</div>
+    <div>㗊 Range</div>
+    <div>ℹ️ About</div>
+    <div>🛒 Cart</div>
+    <div>👤 Profile</div>
 </div>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 4. MAIN TWO-COLUMN LAYOUT
+# 4. MAIN LAYOUT
 # ---------------------------------------------------------
-left_col, right_col = st.columns([1.1, 1.4], gap="large")
+left_col, right_col = st.columns([1, 1.3], gap="large")
 
-# --- LEFT COLUMN: NAVY HERO BANNER ---
+# --- LEFT HERO BANNER ---
 with left_col:
     st.markdown("""
-    <div class="navy-hero">
+    <div class="hero-card">
         <div>
-            <!-- BRAND LOGO -->
-            <div class="brand-title">
+            <div class="brand-logo">
                 <span class="brand-per">per</span><span class="brand-f">F</span><span class="brand-ecto</span>
             </div>
             <div class="brand-sub">LUXURY HOME</div>
             
-            <!-- HEADLINE & SUBTITLE -->
-            <div class="hero-heading">
+            <div class="hero-title">
                 PERFECTING<br>THE ART OF<br>DINING.
             </div>
-            <div class="hero-sub">
+            <div class="hero-text">
                 Luxury Tableware for the Discerning Home.
-            </div>
-            
-            <div class="hero-cta">
-                EXPLORE THE COLLECTION
             </div>
         </div>
         
-        <!-- ITALIAN LANDMARK MOTIF -->
-        <div class="landmark-watermark">
-            <svg width="100%" height="80" viewBox="0 0 300 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 70 V20 H50 V70 M35 20 V70 M100 70 C100 40 140 40 140 70 M140 70 C140 40 180 40 180 70 M180 70 C180 40 220 40 220 70" stroke="#FFFFFF" stroke-width="1.5" stroke-dasharray="3 3"/>
-            </svg>
-            <div style="font-size: 0.65rem; letter-spacing: 3px; color: #A0ABBA; margin-top: 5px;">ITALIAN HERITAGE & DESIGN</div>
+        <div style="border-top: 1px solid rgba(255,255,255,0.15); padding-top: 15px; text-align: center;">
+            <div style="font-size: 0.7rem; letter-spacing: 3px; color: #9CA3AF;">ITALIAN HERITAGE & DESIGN</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# --- RIGHT COLUMN: PRODUCT SHOWCASE & INTERACTIVE FEATURES ---
+# --- RIGHT PRODUCT AREA ---
 with right_col:
-    # 1. Product Image Display
-    image_filename = "product_image.jpg"
+    # 1. Product Image Display (Checks local directory, otherwise loads clear online preview)
+    image_paths = ["188 STAINLESS STEEL CUTLERY DINNER SPOON 6 PCS DINNER FORK 6 PCS DINNER KNIFE TEA SPOON 6 PCS 6 PCS DESSERT FORK 6 PCS SOUP LADLE 1 PC RICE SERVER 1 PC (2800 x 2750 بيكسل).pdf (1).jpg", "product_image.jpg"]
     
-    if os.path.exists(image_filename):
-        st.image(image_filename, use_container_width=True)
+    loaded_img = None
+    for img_path in image_paths:
+        if os.path.exists(img_path):
+            loaded_img = img_path
+            break
+            
+    if loaded_img:
+        st.image(loaded_img, use_container_width=True)
     else:
-        # High quality fallback matching your cutlery photo
-        st.image(
-            "https://images.unsplash.com/photo-1615865417286-dae52c658fdf?q=80&w=1000&auto=format&fit=crop",
-            caption="perFecto 18/10 Stainless Steel 30-Piece Cutlery Set with Rack",
-            use_container_width=True
-        )
+        # Fallback preview if file name is different in your repo
+        st.image("https://images.unsplash.com/photo-1615865417286-dae52c658fdf?q=80&w=1000&auto=format&fit=crop", caption="perFecto 18/10 Cutlery Set Showcase", use_container_width=True)
 
-    # 2. Product Specifications (Matching Callouts)
+    # 2. Key Product Specifications
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("""
-        <div class="spec-callout">
-            <div class="spec-title">30-piece set | 6-person service</div>
-            <div class="spec-desc">Complete dinner, dessert & serving cutlery</div>
+        <div class="spec-box">
+            <div class="spec-h">30-piece set | 6-person service</div>
+            <div class="spec-p">Complete dinner & serving cutlery</div>
         </div>
         """, unsafe_allow_html=True)
     with c2:
         st.markdown("""
-        <div class="spec-callout">
-            <div class="spec-title">Premium 18/10 Stainless Steel</div>
-            <div class="spec-desc">3.0 mm ergonomic thickness & weight balance</div>
+        <div class="spec-box">
+            <div class="spec-h">Premium 18/10 Stainless Steel</div>
+            <div class="spec-p">3.0 mm thickness & balance</div>
         </div>
         """, unsafe_allow_html=True)
 
-    # 3. Product Authenticity Verification Section
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.subheader("🛡️ Product Authenticity Check")
-    st.write("Verify that your **perFecto** set is 100% original and register your 25-Year Guarantee.")
+    # 3. Authenticity Verification Section
+    st.markdown('<div class="feature-card">', unsafe_allow_html=True)
+    st.markdown("### 🛡️ Product Authenticity Check")
+    st.write("Verify your **perFecto** set is 100% original and activate your 25-Year Guarantee.")
     
-    v_col1, v_col2 = st.columns([2.5, 1])
-    with v_col1:
-        serial_input = st.text_input("Product Hologram Serial Number", placeholder="e.g., PER-1810-7792", label_visibility="collapsed")
-    with v_col2:
-        verify_btn = st.button("VERIFY NOW")
-
-    if verify_btn:
-        if serial_input.strip():
-            with st.spinner("Verifying with perFecto Registry..."):
-                time.sleep(0.6)
-            st.success(f"✅ **AUTHENTIC PRODUCT**: Code `{serial_input.upper()}` is verified.")
-            st.info("Warranty Status: **25-Year Coverage Active**")
-        else:
-            st.warning("Please enter the code from your product box.")
+    v1, v2 = st.columns([2.5, 1])
+    with v1:
+        serial = st.text_input("Serial Code", placeholder="e.g. PER-1810-7792", label_visibility="collapsed")
+    with v2:
+        if st.button("VERIFY NOW"):
+            if serial.strip():
+                with st.spinner("Checking..."):
+                    time.sleep(0.5)
+                st.success(f"✅ Code `{serial.upper()}` Verified Original!")
+                st.info("25-Year Manufacturer Warranty Active")
+            else:
+                st.warning("Enter a serial number.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # 4. Mystery / Coming Soon Product Section
-    st.markdown('<div class="section-card" style="border-left: 4px solid #FF3333;">', unsafe_allow_html=True)
-    st.subheader("✨ Coming Soon: The *Venezia* Crystal Collection")
-    st.write("Our new line of hand-blown Italian glassware will be available soon.")
+    # 4. Mystery Reveal (Coming Soon)
+    st.markdown('<div class="feature-card" style="border-left: 4px solid #FF3333;">', unsafe_allow_html=True)
+    st.markdown("### ✨ Coming Soon: Venezia Crystal")
+    st.write("Our upcoming hand-blown Italian crystal tableware collection.")
     
-    e_col1, e_col2 = st.columns([2.5, 1])
-    with e_col1:
-        email_input = st.text_input("VIP Early Access Email", placeholder="Enter your email address", label_visibility="collapsed")
-    with e_col2:
-        notify_btn = st.button("GET VIP ACCESS")
-
-    if notify_btn:
-        if email_input.strip():
-            st.success("Thank you! You are registered for private launch access.")
-        else:
-            st.error("Please enter a valid email.")
+    e1, e2 = st.columns([2.5, 1])
+    with e1:
+        email = st.text_input("VIP Access Email", placeholder="Enter your email address", label_visibility="collapsed")
+    with e2:
+        if st.button("GET VIP ACCESS"):
+            if email.strip():
+                st.success("Registered for early access.")
+            else:
+                st.error("Enter a valid email.")
     st.markdown('</div>', unsafe_allow_html=True)
