@@ -21,6 +21,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# Auto-fix Google Cloud Private Key line break escapes in secrets
+if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+    pk = st.secrets["connections"]["gsheets"].get("private_key", "")
+    if "\\n" in pk:
+        st.secrets["connections"]["gsheets"]["private_key"] = pk.replace("\\n", "\n")
+
 # Initialize Google Sheets connection (reads configuration from secrets)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
