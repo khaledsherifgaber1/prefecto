@@ -23,8 +23,8 @@ st.set_page_config(
 
 # Initialize Google Sheets connection with your explicit spreadsheet URL
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1Tm4WKA4hZwhtE3Uz0FFEnNi8yUU3QkSP-DC5hFhGF2o/edit"
-conn = st.connection("gsheets", type=GSheetsConnection, spreadsheet=SPREADSHEET_URL)
-
+# Initialize Google Sheets connection (reads from secrets)
+conn = st.connection("gsheets", type=GSheetsConnection)
 SERIAL_RE = re.compile(r"PER-\d{4}-\d{4}", re.IGNORECASE)
 EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 
