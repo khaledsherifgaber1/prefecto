@@ -10,7 +10,7 @@ from html import escape
 import pandas as pd
 import streamlit as st
 import gspread
-from google.oauth2.service_account import ServiceAccountCredentials
+from google.oauth2 import service_account
 
 # ---------------------------------------------------------
 # 1. PAGE CONFIG & CONNECTIONS
@@ -34,7 +34,7 @@ class DirectGSheetsConnection:
             pk = pk.replace("\\n", "\n")
         sec["private_key"] = pk.strip()
         
-        creds = ServiceAccountCredentials.from_service_account_info(sec, scopes=scope)
+        creds = service_account.Credentials.from_service_account_info(sec, scopes=scope)
         self.client = gspread.authorize(creds)
         self.spreadsheet_url = sec.get("spreadsheet")
         self.sh = self.client.open_by_url(self.spreadsheet_url)
