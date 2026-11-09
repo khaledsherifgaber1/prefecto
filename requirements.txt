@@ -1,4 +1,5 @@
-streamlit>=1.39
-opencv-python-headless
+streamlit
+st-gsheets-connection
+pandas
 numpy
-pip install st-gsheets-connection
+opencv-python-headless
