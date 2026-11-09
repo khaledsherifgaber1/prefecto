@@ -30,23 +30,26 @@ class DirectGSheetsConnection:
         ]
         sec = dict(secrets_dict)
         
-        # Cleanly resolve private key from either b64 or raw string
-        if "private_key_b64" in sec and sec["private_key_b64"]:
-            sec["private_key"] = base64.b64decode(sec["private_key_b64"]).decode("utf-8", errors="ignore")
+        # If service_account.json exists in your repo root, load it directly to bypass all TOML/PEM errors
+        if os.path.exists("service_account.json"):
+            creds = service_account.Credentials.from_service_account_file("service_account.json", scopes=scope)
         else:
-            pk = sec.get("private_key", "")
-            if isinstance(pk, bytes):
-                pk = pk.decode("utf-8", errors="ignore")
+            # Decode the private key cleanly from Base64 or string fallback
+            if "private_key_b64" in sec and sec["private_key_b64"]:
+                import base64
+                sec["private_key"] = base64.b64decode(sec["private_key_b64"]).decode("utf-8", errors="ignore")
+            else:
+                pk = sec.get("private_key", "")
+                if isinstance(pk, bytes):
+                    pk = pk.decode("utf-8", errors="ignore")
+                pk = pk.replace("\\n", "\n").strip()
+                if pk.startswith('"') and pk.endswith('"'):
+                    pk = pk[1:-1].strip()
+                if pk.startswith("'") and pk.endswith("'"):
+                    pk = pk[1:-1].strip()
+                sec["private_key"] = pk
+            creds = service_account.Credentials.from_service_account_info(sec, scopes=scope)
             
-            # Fix escaped newlines or wrapping quotes if any remain
-            pk = pk.replace("\\n", "\n").strip()
-            if pk.startswith('"') and pk.endswith('"'):
-                pk = pk[1:-1].strip()
-            if pk.startswith("'") and pk.endswith("'"):
-                pk = pk[1:-1].strip()
-            sec["private_key"] = pk
-        
-        creds = service_account.Credentials.from_service_account_info(sec, scopes=scope)
         self.client = gspread.authorize(creds)
         self.spreadsheet_url = sec.get("spreadsheet")
         self.sh = self.client.open_by_url(self.spreadsheet_url)
@@ -638,7 +641,7 @@ with ver_r:
 # ---------------------------------------------------------
 render(f"""
 <div class="pf-footer">
-    <div>© {datetime.now().year} perFecto. Luxury tableware, Italian heritage.</div>
+    <div>© {datetime.now().year} perFecto. luxury tableware, Italian heritage.</div>
     <div>25-year guarantee on every set</div>
 </div>
 """)
