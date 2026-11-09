@@ -50,6 +50,20 @@ hero_b64 = get_image_base64("hero_banner.jpeg")
 product_b64 = get_image_base64("product_cutlery.jpeg")
 teaser_b64 = get_image_base64("teaser_unbreakable.jpeg")
 
+
+@st.cache_data(show_spinner=False)
+def get_logo_src():
+    """Look for logo.png / .svg / .webp / .jpg next to app.py and return a data URI."""
+    mimes = {"png": "image/png", "svg": "image/svg+xml", "webp": "image/webp", "jpg": "image/jpeg", "jpeg": "image/jpeg"}
+    for ext, mime in mimes.items():
+        b64 = get_image_base64(f"logo.{ext}")
+        if b64:
+            return f"data:{mime};base64,{b64}"
+    return None
+
+
+logo_src = get_logo_src()
+
 # ---------------------------------------------------------
 # 2. HELPERS: QR, REGISTRY, EMAIL
 # ---------------------------------------------------------
@@ -203,6 +217,7 @@ p,label,span,div { font-family:'Jost',sans-serif; }
     padding:20px 4px; margin-bottom:26px; background:rgba(246,244,240,.9); backdrop-filter:blur(12px); border-bottom:1px solid var(--line); }
 .pf-logo { font-family:'Cormorant Garamond',serif; font-size:1.9rem; font-weight:700; color:var(--navy); }
 .pf-logo b { color:var(--gold); }
+.pf-logo-img { height:46px; width:auto; display:block; }
 .pf-links { display:flex; gap:36px; align-items:center; }
 .pf-links a { color:var(--ink) !important; text-decoration:none !important; font-size:.92rem; letter-spacing:.03em; padding:4px 0;
     background:linear-gradient(var(--gold),var(--gold)) 0 100%/0 1px no-repeat; transition:background-size .35s; }
@@ -227,7 +242,7 @@ p,label,span,div { font-family:'Jost',sans-serif; }
 .pf-section { padding-top:78px; }
 
 /* ---------- Coming soon (top of page) ---------- */
-.st-key-vip { position:relative; overflow:hidden; border-radius:18px; padding:46px 48px !important; border:1px solid rgba(184,151,90,.35);
+.st-key-vip { position:relative; overflow:hidden; border-radius:18px; padding:46px 48px !important; min-height:500px; justify-content:center; border:1px solid rgba(184,151,90,.35);
     background:
       radial-gradient(circle at 20% 20%, rgba(184,151,90,.22), transparent 42%),
       radial-gradient(circle at 80% 80%, rgba(40,90,190,.30), transparent 46%),
@@ -306,10 +321,15 @@ p,label,span,div { font-family:'Jost',sans-serif; }
 # ---------------------------------------------------------
 # 4. NAVIGATION
 # ---------------------------------------------------------
-render("""
+logo_html = (
+    f'<img class="pf-logo-img" src="{logo_src}" alt="perFecto"/>'
+    if logo_src
+    else '<div class="pf-logo">per<b>F</b>ecto</div>'
+)
+render(f"""
 <div id="top"></div>
 <div class="pf-nav">
-    <div class="pf-logo">per<b>F</b>ecto</div>
+    {logo_html}
     <div class="pf-links">
         <a href="#top">Home</a>
         <a href="#range">The set</a>
@@ -322,17 +342,44 @@ render("""
 # ---------------------------------------------------------
 # 5. COMING SOON  (top of the page)
 # ---------------------------------------------------------
+# The teaser image fills the whole section as a slowly zooming background,
+# with a navy gradient on the left so the text stays readable.
+if teaser_b64:
+    st.markdown(
+        f"""
+<style>
+.st-key-vip {{ animation:none !important; }}
+.st-key-vip::before {{
+    content:''; position:absolute; inset:0; z-index:0;
+    background:url(data:image/jpeg;base64,{teaser_b64}) center/cover no-repeat;
+    animation:pf-kb 22s ease-in-out infinite alternate;
+}}
+.st-key-vip::after {{
+    content:''; position:absolute; inset:0; z-index:0;
+    background:linear-gradient(90deg, rgba(5,14,30,.94) 0%, rgba(5,14,30,.72) 42%, rgba(5,14,30,.12) 100%);
+}}
+@media (max-width:768px) {{
+    .st-key-vip::after {{ background:linear-gradient(180deg, rgba(5,14,30,.9) 0%, rgba(5,14,30,.7) 100%); }}
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
 with st.container(key="vip"):
-    t_l, t_r = st.columns([1.1, 1], gap="large")
+    t_l, _ = st.columns([1.15, 1], gap="large")
     with t_l:
         render("""
         <div class="pf-load" style="--d:.1s"><div class="pf-badge"><i></i>Coming soon</div></div>
         <div class="pf-load" style="--d:.25s"><div class="pf-h1">Something unbreakable is coming.</div></div>
         <div class="pf-load" style="--d:.4s"><div class="pf-rule"></div></div>
-        <div class="pf-load" style="--d:.5s"><p class="pf-sub">A new perFecto collection, built for endurance. Join the private list to see it before anyone else.</p></div>
         """)
-        email_vip = st.text_input("Email address", placeholder="you@example.com", label_visibility="collapsed", key="vip_email")
-        if st.button("Get early access", key="vip_btn"):
+        e1, e2 = st.columns([2.2, 1], gap="small")
+        with e1:
+            email_vip = st.text_input("Email address", placeholder="Your email address", label_visibility="collapsed", key="vip_email")
+        with e2:
+            vip_clicked = st.button("Get early access", key="vip_btn")
+        if vip_clicked:
             if EMAIL_RE.fullmatch(email_vip.strip()):
                 try:
                     with open(VIP_FILE, "a", newline="", encoding="utf-8") as f:
@@ -342,8 +389,6 @@ with st.container(key="vip"):
                 st.success("You're on the list. We'll email you before the launch.")
             else:
                 st.error("Enter a valid email address, like you@example.com.")
-    with t_r:
-        render(f'<div class="pf-load pf-float" style="--d:.35s"><div class="pf-frame">{image_tag(teaser_b64, "Something unbreakable is coming", "teaser_unbreakable.jpeg")}</div></div>')
 
 # ---------------------------------------------------------
 # 6. HERO
