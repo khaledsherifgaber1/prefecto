@@ -29,10 +29,16 @@ class DirectGSheetsConnection:
             "https://www.googleapis.com/auth/drive"
         ]
         sec = dict(secrets_dict)
-        pk = sec.get("private_key", "")
-        if "\\n" in pk:
-            pk = pk.replace("\\n", "\n")
-        sec["private_key"] = pk.strip()
+        
+        # Decode the private key safely from Base64 if private_key_b64 is used
+        if "private_key_b64" in sec and sec["private_key_b64"]:
+            import base64
+            sec["private_key"] = base64.b64decode(sec["private_key_b64"]).decode("utf-8")
+        else:
+            pk = sec.get("private_key", "")
+            if "\\n" in pk:
+                pk = pk.replace("\\n", "\n")
+            sec["private_key"] = pk.strip()
         
         creds = service_account.Credentials.from_service_account_info(sec, scopes=scope)
         self.client = gspread.authorize(creds)
@@ -55,7 +61,6 @@ class DirectGSheetsConnection:
         ws.clear()
         df_clean = data.fillna("")
         ws.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
-
 # Initialize robust direct connection
 try:
     conn = DirectGSheetsConnection(st.secrets["connections"]["gsheets"])
