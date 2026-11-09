@@ -30,13 +30,12 @@ class DirectGSheetsConnection:
         ]
         sec = dict(secrets_dict)
         
-        # If service_account.json exists in your repo root, load it directly to bypass all TOML/PEM errors
+        # If service_account.json exists in your project root, load it directly to completely bypass TOML/PEM errors
         if os.path.exists("service_account.json"):
             creds = service_account.Credentials.from_service_account_file("service_account.json", scopes=scope)
         else:
-            # Decode the private key cleanly from Base64 or string fallback
+            # Fallback handling for Base64 or standard secret strings
             if "private_key_b64" in sec and sec["private_key_b64"]:
-                import base64
                 sec["private_key"] = base64.b64decode(sec["private_key_b64"]).decode("utf-8", errors="ignore")
             else:
                 pk = sec.get("private_key", "")
@@ -641,7 +640,7 @@ with ver_r:
 # ---------------------------------------------------------
 render(f"""
 <div class="pf-footer">
-    <div>© {datetime.now().year} perFecto. luxury tableware, Italian heritage.</div>
+    <div>© {datetime.now().year} perFecto. Luxury tableware, Italian heritage.</div>
     <div>25-year guarantee on every set</div>
 </div>
 """)
