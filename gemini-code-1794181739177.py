@@ -108,16 +108,14 @@ def save_registration(serial, email, phone, email_sent):
 
 
 def smtp_settings():
-    """Read SMTP settings from .streamlit/secrets.toml ([smtp]) or SMTP_* env vars."""
-    try:
-        cfg = dict(st.secrets["smtp"])
-        if cfg.get("host"):
-            return cfg
-    except Exception:
-        pass
-    if os.getenv("SMTP_HOST"):
-        return {k: os.getenv(f"SMTP_{k.upper()}") for k in ("host", "port", "user", "password", "sender")}
-    return None
+    """Return hardcoded SMTP settings for local testing."""
+    return {
+        "host": "smtp.gmail.com",
+        "port": 465,
+        "user": "gaberkhaled780@gmail.com",
+        "password": "xbfm rbqf vwvh pywi",
+        "sender": "gaberkhaled780@gmail.com"
+    }
 
 
 def send_confirmation_email(to_email: str, serial: str):
