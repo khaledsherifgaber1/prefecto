@@ -1,5 +1,4 @@
 import base64
-import csv
 import os
 import re
 import smtplib
@@ -8,7 +7,9 @@ from datetime import datetime
 from email.message import EmailMessage
 from html import escape
 
+import pandas as pd
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 
 # ---------------------------------------------------------
 # 1. PAGE CONFIG
@@ -20,8 +21,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-REGISTRATIONS_FILE = "registrations.csv"
-VIP_FILE = "vip_list.csv"
+# Initialize Google Sheets connection with your explicit spreadsheet URL
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1Tm4WKA4hZwhtE3Uz0FFEnNi8yUU3QkSP-DC5hFhGF2o/edit"
+conn = st.connection("gsheets", type=GSheetsConnection, spreadsheet=SPREADSHEET_URL)
+
 SERIAL_RE = re.compile(r"PER-\d{4}-\d{4}", re.IGNORECASE)
 EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 
@@ -65,7 +68,7 @@ def get_logo_src():
 logo_src = get_logo_src()
 
 # ---------------------------------------------------------
-# 2. HELPERS: QR, REGISTRY, EMAIL
+# 2. HELPERS: QR, REGISTRY (GOOGLE SHEETS), EMAIL
 # ---------------------------------------------------------
 def decode_qr(uploaded_file):
     """Read a QR code from a camera photo or uploaded image. Returns text or None."""
@@ -81,7 +84,7 @@ def decode_qr(uploaded_file):
         return None
     detector = cv2.QRCodeDetector()
     text, _, _ = detector.detectAndDecode(img)
-    if not text:  # second try: grayscale + enlarge, helps with small or blurry codes
+    if not text:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         big = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
         text, _, _ = detector.detectAndDecode(big)
@@ -89,22 +92,56 @@ def decode_qr(uploaded_file):
 
 
 def find_registration(serial: str):
-    if not os.path.exists(REGISTRATIONS_FILE):
-        return None
-    with open(REGISTRATIONS_FILE, newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            if row.get("serial") == serial:
-                return row
+    """Check Google Sheets 'registrations' tab for an existing serial."""
+    try:
+        df = conn.read(worksheet="registrations", ttl=0)
+        if df is not None and not df.empty and "serial" in df.columns:
+            df["serial"] = df["serial"].astype(str)
+            matched = df[df["serial"].str.upper() == serial.upper()]
+            if not matched.empty:
+                return matched.iloc[-1].to_dict()
+    except Exception as e:
+        st.error(f"Error reading registrations sheet: {e}")
     return None
 
 
 def save_registration(serial, email, phone, email_sent):
-    new_file = not os.path.exists(REGISTRATIONS_FILE)
-    with open(REGISTRATIONS_FILE, "a", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        if new_file:
-            w.writerow(["timestamp", "serial", "email", "phone", "email_sent"])
-        w.writerow([datetime.now().isoformat(timespec="seconds"), serial, email, phone, email_sent])
+    """Append a new registration row to the 'registrations' tab in Google Sheets."""
+    try:
+        df = conn.read(worksheet="registrations", ttl=0)
+        new_row = pd.DataFrame([{
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "serial": serial,
+            "email": email,
+            "phone": phone,
+            "email_sent": str(email_sent)
+        }])
+        if df is not None and not df.empty:
+            updated_df = pd.concat([df, new_row], ignore_index=True)
+        else:
+            updated_df = new_row
+        conn.update(worksheet="registrations", data=updated_df)
+    except Exception as e:
+        st.error(f"Error saving registration to Google Sheets: {e}")
+
+
+def save_vip_email(email):
+    """Append a new VIP email row to the 'vip_list' tab in Google Sheets."""
+    try:
+        df = conn.read(worksheet="vip_list", ttl=0)
+        new_row = pd.DataFrame([{
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "email": email
+        }])
+        if df is not None and not df.empty:
+            updated_df = pd.concat([df, new_row], ignore_index=True)
+        else:
+            updated_df = new_row
+        conn.update(worksheet="vip_list", data=updated_df)
+        return True
+    except Exception as e:
+        st.error(f"Error saving VIP signup: {e}")
+        return False
 
 
 def smtp_settings():
@@ -113,7 +150,7 @@ def smtp_settings():
         "host": "smtp.gmail.com",
         "port": 465,
         "user": "gaberkhaled780@gmail.com",
-        "password": "xbfm rbqf vwvh pywi",
+        "password": "xbfmrbqfvwvhpywi",
         "sender": "gaberkhaled780@gmail.com"
     }
 
@@ -122,7 +159,7 @@ def send_confirmation_email(to_email: str, serial: str):
     """Returns (sent: bool, reason: str)."""
     cfg = smtp_settings()
     if not cfg:
-        return False, "Email sending isn't set up yet (add SMTP settings to .streamlit/secrets.toml)."
+        return False, "Email sending isn't set up yet."
     date = datetime.now().strftime("%d %B %Y")
     text = (
         f"Thank you for choosing perFecto.\n\n"
@@ -168,13 +205,12 @@ def send_confirmation_email(to_email: str, serial: str):
                 server.login(cfg["user"], cfg.get("password") or "")
             server.send_message(msg)
         return True, "sent"
-    except Exception as e:  # network, auth, etc.
+    except Exception as e:
         return False, f"The email server returned an error: {e}"
 
 
 # ---------------------------------------------------------
 # 3. DESIGN SYSTEM
-#    Navy #0A1B3A · Gold #B8975A · Stone #F6F4F0 · Green #00A859 (verified only)
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -192,7 +228,6 @@ html { scroll-behavior:smooth; }
 h1,h2,h3,h4 { font-family:'Cormorant Garamond',serif !important; color:var(--navy); }
 p,label,span,div { font-family:'Jost',sans-serif; }
 
-/* ---------- Keyframes ---------- */
 @keyframes pf-rise { from { opacity:0; transform:translateY(34px); } to { opacity:1; transform:none; } }
 @keyframes pf-shimmer { to { background-position:-200% 0; } }
 @keyframes pf-sheen { 0% { left:-60%; } 55%,100% { left:140%; } }
@@ -203,14 +238,11 @@ p,label,span,div { font-family:'Jost',sans-serif; }
 @keyframes pf-glow { 0% { background-position:0% 0%, 100% 100%; } 100% { background-position:30% 40%, 70% 60%; } }
 @keyframes pf-pop { 0% { transform:scale(.3); opacity:0; } 70% { transform:scale(1.15); } 100% { transform:scale(1); opacity:1; } }
 
-/* One orchestrated entrance on page load */
 .pf-load { animation:pf-rise 1s cubic-bezier(.2,.7,.2,1) both; animation-delay:var(--d,0s); }
-/* Scroll reveal where the browser supports it; otherwise content simply shows */
 @supports (animation-timeline: view()) {
     .pf-reveal { animation:pf-rise linear both; animation-timeline:view(); animation-range:entry 0% cover 26%; }
 }
 
-/* ---------- Navigation ---------- */
 .pf-nav { position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between;
     padding:20px 4px; margin-bottom:26px; background:rgba(246,244,240,.9); backdrop-filter:blur(12px); border-bottom:1px solid var(--line); }
 .pf-logo { font-family:'Cormorant Garamond',serif; font-size:1.9rem; font-weight:700; color:var(--navy); }
@@ -223,23 +255,19 @@ p,label,span,div { font-family:'Jost',sans-serif; }
 .pf-links a.pf-cta { background:var(--navy); color:#fff !important; padding:10px 22px; border-radius:999px; transition:background .25s; }
 .pf-links a.pf-cta:hover { background:#12306a; }
 
-/* ---------- Gold details ---------- */
 .pf-rule { height:1px; width:96px; margin:0 0 22px 0; background:linear-gradient(90deg,var(--gold),var(--gold-soft),var(--gold),var(--gold-soft)); background-size:200% 100%; animation:pf-shimmer 4s linear infinite; }
 .pf-frame { position:relative; border-radius:14px; overflow:hidden; background:var(--navy); box-shadow:0 34px 60px -28px rgba(10,27,58,.5); }
 .pf-frame::after { content:''; position:absolute; inset:12px; border:1px solid rgba(231,216,181,.65); border-radius:8px; pointer-events:none; }
 .pf-img { width:100%; display:block; object-fit:cover; animation:pf-kb 20s ease-in-out infinite alternate; }
 .pf-placeholder { min-height:320px; display:flex; align-items:center; justify-content:center; text-align:center; color:#9AA3B5; font-size:.9rem; padding:30px;
     background:repeating-linear-gradient(135deg,#0d2149,#0d2149 12px,#0A1B3A 12px,#0A1B3A 24px); }
-.pf-float { animation:pf-float 7s ease-in-out infinite; }
 
-/* ---------- Headings ---------- */
 .pf-kicker { font-size:.85rem; color:var(--steel); margin-bottom:8px; }
 .pf-h1 { font-family:'Cormorant Garamond',serif; font-size:clamp(2.8rem,5.4vw,5rem); line-height:1.02; font-weight:600; color:var(--navy); margin:0 0 22px; }
 .pf-h2 { font-family:'Cormorant Garamond',serif; font-size:clamp(2rem,3.4vw,3rem); font-weight:600; color:var(--navy); line-height:1.1; margin:0 0 14px; }
 .pf-sub { color:var(--steel); font-size:1.04rem; line-height:1.75; max-width:500px; font-weight:300; }
 .pf-section { padding-top:78px; }
 
-/* ---------- Coming soon (top of page) ---------- */
 .st-key-vip { position:relative; overflow:hidden; border-radius:18px; padding:46px 48px !important; min-height:500px; justify-content:center; border:1px solid rgba(184,151,90,.35);
     background:
       radial-gradient(circle at 20% 20%, rgba(184,151,90,.22), transparent 42%),
@@ -252,7 +280,6 @@ p,label,span,div { font-family:'Jost',sans-serif; }
 .pf-badge { display:inline-flex; align-items:center; gap:10px; color:var(--gold-soft); font-size:.85rem; letter-spacing:.14em; text-transform:uppercase; margin-bottom:18px; }
 .pf-badge i { width:9px; height:9px; border-radius:50%; background:var(--gold); animation:pf-pulse 1.8s infinite; }
 
-/* ---------- Hero ---------- */
 .pf-hero-text { padding:30px 10px 0 4px; }
 .pf-hero-text p.lead { font-size:1.12rem; line-height:1.75; color:var(--steel); max-width:470px; font-weight:300; margin-bottom:30px; }
 .pf-actions { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:34px; }
@@ -263,13 +290,11 @@ p,label,span,div { font-family:'Jost',sans-serif; }
 .pf-btn.ghost:hover { background:var(--navy); color:#fff !important; }
 .pf-origin { font-size:.82rem; color:var(--steel); letter-spacing:.04em; border-top:1px solid var(--line); padding-top:16px; max-width:470px; }
 
-/* ---------- Marquee ---------- */
 .pf-marquee { margin-top:70px; overflow:hidden; border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:20px 0; }
 .pf-track { display:flex; width:max-content; animation:pf-marquee 34s linear infinite; }
 .pf-track span { font-family:'Cormorant Garamond',serif; font-size:1.5rem; color:var(--navy); padding:0 28px; white-space:nowrap; }
 .pf-track span.d { color:var(--gold); padding:0; font-size:.9rem; align-self:center; }
 
-/* ---------- Product ---------- */
 .pf-specs { display:grid; grid-template-columns:repeat(2,1fr); margin-top:26px; border-top:1px solid var(--line); }
 .pf-spec { padding:22px 6px 22px 0; border-bottom:1px solid var(--line); }
 .pf-spec:nth-child(odd) { border-right:1px solid var(--line); }
@@ -278,7 +303,6 @@ p,label,span,div { font-family:'Jost',sans-serif; }
 .pf-spec .l { font-size:.85rem; color:var(--steel); margin-top:6px; }
 .pf-note { margin-top:20px; font-size:.95rem; line-height:1.7; font-weight:300; }
 
-/* ---------- Verification card ---------- */
 .st-key-verify { background:var(--paper); border:1px solid var(--line); border-top:2px solid var(--gold); border-radius:14px; padding:30px 34px !important; box-shadow:0 24px 44px -32px rgba(10,27,58,.4); }
 .pf-step { display:flex; align-items:center; gap:12px; margin:2px 0 14px; font-weight:500; color:var(--navy); }
 .pf-step b { width:28px; height:28px; border-radius:50%; border:1px solid var(--gold); color:var(--gold); display:flex; align-items:center; justify-content:center; font-size:.85rem; }
@@ -288,14 +312,11 @@ p,label,span,div { font-family:'Jost',sans-serif; }
 .pf-ok .s { font-size:.9rem; color:#3F6F58; margin-top:2px; }
 .pf-small { font-size:.82rem; color:var(--steel); line-height:1.6; }
 
-/* ---------- Streamlit widgets ---------- */
 .stTextInput input { border-radius:10px !important; border:1px solid #CFCAC0 !important; background:#fff !important; color:var(--ink) !important; height:50px; padding:0 16px !important; font-size:.98rem !important; }
 .stTextInput input:focus { border-color:var(--gold) !important; box-shadow:0 0 0 3px rgba(184,151,90,.22) !important; }
-.stTextInput div[data-baseweb="input"], .stTextInput div[data-baseweb="base-input"] { background:transparent !important; border:none !important; }
 .stButton > button, .stFormSubmitButton > button { background:var(--navy) !important; color:#fff !important; border:none !important; border-radius:10px !important; height:50px; font-weight:500 !important; width:100%; transition:all .25s; }
 .stButton > button:hover, .stFormSubmitButton > button:hover { background:#12306a !important; transform:translateY(-2px); box-shadow:0 12px 20px -12px rgba(10,27,58,.7); color:#fff !important; }
 .st-key-vip .stButton > button { background:linear-gradient(100deg,var(--gold),var(--gold-soft),var(--gold)) !important; background-size:200% 100% !important; color:var(--navy) !important; font-weight:600 !important; }
-.st-key-vip .stButton > button:hover { background-position:100% 0 !important; color:var(--navy) !important; }
 .stTabs [data-baseweb="tab"] { font-family:'Jost',sans-serif; color:var(--steel); }
 .stTabs [aria-selected="true"] { color:var(--navy) !important; }
 .stTabs [data-baseweb="tab-highlight"] { background:var(--gold) !important; }
@@ -310,7 +331,6 @@ p,label,span,div { font-family:'Jost',sans-serif; }
     .st-key-vip { padding:28px 22px !important; }
     .st-key-verify { padding:22px 18px !important; }
 }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation:none !important; transition:none !important; } html { scroll-behavior:auto; } }
 </style>
 """,
     unsafe_allow_html=True,
@@ -338,10 +358,8 @@ render(f"""
 """)
 
 # ---------------------------------------------------------
-# 5. COMING SOON  (top of the page)
+# 5. COMING SOON
 # ---------------------------------------------------------
-# The teaser image fills the whole section as a slowly zooming background,
-# with a navy gradient on the left so the text stays readable.
 if teaser_b64:
     st.markdown(
         f"""
@@ -355,9 +373,6 @@ if teaser_b64:
 .st-key-vip::after {{
     content:''; position:absolute; inset:0; z-index:0;
     background:linear-gradient(90deg, rgba(5,14,30,.94) 0%, rgba(5,14,30,.72) 42%, rgba(5,14,30,.12) 100%);
-}}
-@media (max-width:768px) {{
-    .st-key-vip::after {{ background:linear-gradient(180deg, rgba(5,14,30,.9) 0%, rgba(5,14,30,.7) 100%); }}
 }}
 </style>
 """,
@@ -379,12 +394,8 @@ with st.container(key="vip"):
             vip_clicked = st.button("Get early access", key="vip_btn")
         if vip_clicked:
             if EMAIL_RE.fullmatch(email_vip.strip()):
-                try:
-                    with open(VIP_FILE, "a", newline="", encoding="utf-8") as f:
-                        csv.writer(f).writerow([datetime.now().isoformat(timespec="seconds"), email_vip.strip()])
-                except OSError:
-                    pass  # swap for a database or email service in production
-                st.success("You're on the list. We'll email you before the launch.")
+                if save_vip_email(email_vip.strip()):
+                    st.success("You're on the list. We'll email you before the launch.")
             else:
                 st.error("Enter a valid email address, like you@example.com.")
 
@@ -490,8 +501,8 @@ with ver_r:
             """)
             existing = find_registration(ss.serial)
             if existing:
-                st.info("This set was already registered on "
-                        f"{existing['timestamp'][:10]}. If that wasn't you, please contact perFecto support.")
+                reg_date = str(existing.get('timestamp', ''))[:10]
+                st.info(f"This set was already registered on {reg_date}. If that wasn't you, please contact perFecto support.")
             else:
                 with st.form("register_form", border=False):
                     email = st.text_input("Email", placeholder="you@example.com")
@@ -550,7 +561,7 @@ with ver_r:
                 match = SERIAL_RE.search(candidate)
                 if match:
                     with st.spinner("Checking the perFecto registry..."):
-                        time.sleep(0.6)  # TODO: replace with a real registry lookup
+                        time.sleep(0.6)
                     ss.serial = match.group(0).upper()
                     st.rerun()
                 else:
