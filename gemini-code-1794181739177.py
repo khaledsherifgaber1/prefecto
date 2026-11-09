@@ -30,7 +30,7 @@ class DirectGSheetsConnection:
         ]
         sec = dict(secrets_dict)
         
-        # Decode the private key safely from Base64 if private_key_b64 is used
+        # Decode the private key cleanly from Base64
         if "private_key_b64" in sec and sec["private_key_b64"]:
             import base64
             sec["private_key"] = base64.b64decode(sec["private_key_b64"]).decode("utf-8", errors="ignore")
@@ -38,9 +38,7 @@ class DirectGSheetsConnection:
             pk = sec.get("private_key", "")
             if isinstance(pk, bytes):
                 pk = pk.decode("utf-8", errors="ignore")
-            if "\\n" in pk:
-                pk = pk.replace("\\n", "\n")
-            sec["private_key"] = pk.strip()
+            sec["private_key"] = pk.replace("\\n", "\n").strip()
         
         creds = service_account.Credentials.from_service_account_info(sec, scopes=scope)
         self.client = gspread.authorize(creds)
@@ -63,7 +61,6 @@ class DirectGSheetsConnection:
         ws.clear()
         df_clean = data.fillna("")
         ws.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
-
 # Initialize robust direct connection
 try:
     conn = DirectGSheetsConnection(st.secrets["connections"]["gsheets"])
