@@ -24,11 +24,10 @@ st.set_page_config(
 class GitHubStorageBackend:
     """Replaces Google Sheets with direct CSV tracking via GitHub repository."""
     def __init__(self):
-        # Update your GitHub repository owner and name here if needed
-        self.repo_owner = "khaled2258"
+        # Corrected repository owner name
+        self.repo_owner = "khaledsherifgaber1"
         self.repo_name = "prefecto"
         self.branch = "main"
-        # Reads GitHub Personal Access Token from Streamlit secrets (or environment)
         self.token = st.secrets.get("GITHUB_TOKEN", os.environ.get("GITHUB_TOKEN", ""))
 
     def read(self, filename: str):
