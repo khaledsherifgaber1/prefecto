@@ -29,18 +29,16 @@ class DirectGSheetsConnection:
             "https://www.googleapis.com/auth/drive"
         ]
         
-        # Load directly from the uploaded service_account.json file in your repository
+        # Load directly from the service_account.json file in your repository root
         if os.path.exists("service_account.json"):
             creds = service_account.Credentials.from_service_account_file("service_account.json", scopes=scope)
             with open("service_account.json", "r") as f:
                 import json
                 file_info = json.load(f)
-                self.spreadsheet_url = file_info.get("spreadsheet") or st.secrets["connections"]["gsheets"]["spreadsheet"]
+                # You can store your spreadsheet URL directly inside service_account.json or replace the string below
+                self.spreadsheet_url = file_info.get("spreadsheet", "https://docs.google.com/spreadsheets/d/1Tm4WKA4hZwhtE3Uz0FFEnNi8yUU3QkSP-DC5hFhGF2o/edit")
         else:
-            # Fallback if secrets.toml is used
-            sec = dict(st.secrets["connections"]["gsheets"])
-            creds = service_account.Credentials.from_service_account_info(sec, scopes=scope)
-            self.spreadsheet_url = sec.get("spreadsheet")
+            raise FileNotFoundError("service_account.json not found in the project repository root.")
             
         self.client = gspread.authorize(creds)
         self.sh = self.client.open_by_url(self.spreadsheet_url)
@@ -62,7 +60,7 @@ class DirectGSheetsConnection:
         df_clean = data.fillna("")
         ws.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
 
-# Initialize robust direct connection
+# Initialize robust direct connection using the JSON file
 try:
     conn = DirectGSheetsConnection()
 except Exception as e:
@@ -71,7 +69,6 @@ except Exception as e:
 
 SERIAL_RE = re.compile(r"PER-\d{4}-\d{4}", re.IGNORECASE)
 EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
-
 
 @st.cache_data(show_spinner=False)
 def get_image_base64(file_path: str):
