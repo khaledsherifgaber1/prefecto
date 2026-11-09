@@ -1,5 +1,7 @@
 streamlit
-st-gsheets-connection
+streamlit-gsheets
+gspread
+google-auth
 pandas
-numpy
 opencv-python-headless
+numpy
