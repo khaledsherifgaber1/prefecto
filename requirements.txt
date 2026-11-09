@@ -1,3 +1,4 @@
 streamlit>=1.39
 opencv-python-headless
 numpy
+pip install st-gsheets-connection
