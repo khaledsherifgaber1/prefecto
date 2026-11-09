@@ -9,11 +9,10 @@ from html import escape
 
 import pandas as pd
 import streamlit as st
-import gspread
-from google.oauth2 import service_account
+import requests
 
 # ---------------------------------------------------------
-# 1. PAGE CONFIG & CONNECTIONS
+# 1. PAGE CONFIG & GITHUB STORAGE BACKEND
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="perFecto | Italian Luxury Tableware",
@@ -22,57 +21,63 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-class DirectGSheetsConnection:
-    def __init__(self, secrets_dict):
-        scope = [
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        
-        # Load directly from the service_account.json file in your repository root
-        if os.path.exists("service_account.json"):
-            creds = service_account.Credentials.from_service_account_file(
-                "service_account.json", 
-                scopes=scope
-            )
-            with open("service_account.json", "r") as f:
-                import json
-                file_info = json.load(f)
-                self.spreadsheet_url = file_info.get("spreadsheet", "https://docs.google.com/spreadsheets/d/1Tm4WKA4hZwhtE3Uz0FFEnNi8yUU3QkSP-DC5hFhGF2o/edit")
-        else:
-            sec = dict(secrets_dict)
-            creds = service_account.Credentials.from_service_account_info(sec, scopes=scope)
-            self.spreadsheet_url = sec.get("spreadsheet")
-            
-        self.client = gspread.authorize(creds)
-        self.sh = self.client.open_by_url(self.spreadsheet_url)
+class GitHubStorageBackend:
+    """Replaces Google Sheets with direct CSV tracking via GitHub repository."""
+    def __init__(self):
+        # Update your GitHub repository owner and name here if needed
+        self.repo_owner = "khaled2258"
+        self.repo_name = "prefecto"
+        self.branch = "main"
+        # Reads GitHub Personal Access Token from Streamlit secrets (or environment)
+        self.token = st.secrets.get("GITHUB_TOKEN", os.environ.get("GITHUB_TOKEN", ""))
 
-    def read(self, worksheet: str, ttl=0):
+    def read(self, filename: str):
+        """Read CSV data from GitHub raw content URL."""
+        url = f"https://raw.githubusercontent.com/{self.repo_owner}/{self.repo_name}/{self.branch}/{filename}.csv"
         try:
-            ws = self.sh.worksheet(worksheet)
-            data = ws.get_all_records()
-            return pd.DataFrame(data)
+            df = pd.read_csv(url)
+            return df
         except Exception:
             return pd.DataFrame()
 
-    def update(self, worksheet: str, data: pd.DataFrame):
-        try:
-            ws = self.sh.worksheet(worksheet)
-        except Exception:
-            ws = self.sh.add_worksheet(title=worksheet, rows=100, cols=20)
-        ws.clear()
-        df_clean = data.fillna("")
-        ws.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
+    def update(self, filename: str, df: pd.DataFrame):
+        """Commit updated CSV back to GitHub repository via GitHub REST API."""
+        if not self.token:
+            st.error("GitHub Personal Access Token (GITHUB_TOKEN) is missing from Streamlit Secrets.")
+            return False
+            
+        csv_content = df.to_csv(index=False)
+        encoded_content = base64.b64encode(csv_content.encode("utf-8")).decode("utf-8")
+        
+        file_path = f"{filename}.csv"
+        api_url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/contents/{file_path}"
+        
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Accept": "application/vnd.github+json"
+        }
+        
+        # Get current file sha (required by GitHub API for updates)
+        res = requests.get(api_url, headers=headers)
+        sha = res.json().get("sha") if res.status_code == 200 else None
+        
+        payload = {
+            "message": f"Update {file_path} via Streamlit app",
+            "content": encoded_content,
+            "branch": self.branch
+        }
+        if sha:
+            payload["sha"] = sha
+            
+        put_res = requests.put(api_url, json=payload, headers=headers)
+        return put_res.status_code in [200, 201]
 
-# Initialize robust direct connection
-try:
-    conn = DirectGSheetsConnection(st.secrets["connections"]["gsheets"] if "connections" in st.secrets else {})
-except Exception as e:
-    st.error(f"Google Sheets connection error: {e}")
-    conn = None
+# Initialize storage backend
+conn = GitHubStorageBackend()
 
 SERIAL_RE = re.compile(r"PER-\d{4}-\d{4}", re.IGNORECASE)
 EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
 
 @st.cache_data(show_spinner=False)
 def get_image_base64(file_path: str):
@@ -113,7 +118,7 @@ def get_logo_src():
 logo_src = get_logo_src()
 
 # ---------------------------------------------------------
-# 2. HELPERS: QR, REGISTRY (GOOGLE SHEETS), EMAIL
+# 2. HELPERS: QR, REGISTRY (GITHUB STORAGE), EMAIL
 # ---------------------------------------------------------
 def decode_qr(uploaded_file):
     """Read a QR code from a camera photo or uploaded image. Returns text or None."""
@@ -137,27 +142,23 @@ def decode_qr(uploaded_file):
 
 
 def find_registration(serial: str):
-    """Check Google Sheets 'registrations' tab for an existing serial."""
-    if not conn:
-        return None
+    """Check GitHub 'registrations.csv' for an existing serial."""
     try:
-        df = conn.read(worksheet="registrations", ttl=0)
+        df = conn.read("registrations")
         if df is not None and not df.empty and "serial" in df.columns:
             df["serial"] = df["serial"].astype(str)
             matched = df[df["serial"].str.upper() == serial.upper()]
             if not matched.empty:
                 return matched.iloc[-1].to_dict()
     except Exception as e:
-        st.error(f"Error reading registrations sheet: {e}")
+        st.error(f"Error reading registrations: {e}")
     return None
 
 
 def save_registration(serial, email, phone, email_sent):
-    """Append a new registration row to the 'registrations' tab in Google Sheets."""
-    if not conn:
-        return
+    """Append a new registration row and commit to GitHub."""
     try:
-        df = conn.read(worksheet="registrations", ttl=0)
+        df = conn.read("registrations")
         new_row = pd.DataFrame([{
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "serial": str(serial),
@@ -174,17 +175,15 @@ def save_registration(serial, email, phone, email_sent):
         else:
             updated_df = new_row
             
-        conn.update(worksheet="registrations", data=updated_df)
+        conn.update("registrations", updated_df)
     except Exception as e:
-        st.error(f"Error saving registration to Google Sheets: {e}")
+        st.error(f"Error saving registration to GitHub: {e}")
 
 
 def save_vip_email(email):
-    """Append a new VIP email row to the 'vip_list' tab in Google Sheets."""
-    if not conn:
-        return False
+    """Append a new VIP email row and commit to GitHub."""
     try:
-        df = conn.read(worksheet="vip_list", ttl=0)
+        df = conn.read("vip_list")
         new_row = pd.DataFrame([{
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "email": str(email)
@@ -198,7 +197,7 @@ def save_vip_email(email):
         else:
             updated_df = new_row
             
-        conn.update(worksheet="vip_list", data=updated_df)
+        conn.update("vip_list", updated_df)
         return True
     except Exception as e:
         st.error(f"Error saving VIP signup: {e}")
@@ -637,3 +636,4 @@ render(f"""
     <div>25-year guarantee on every set</div>
 </div>
 """)
+
