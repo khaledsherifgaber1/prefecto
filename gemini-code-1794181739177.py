@@ -9,7 +9,8 @@ from html import escape
 
 import pandas as pd
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
+import gspread
+from google.oauth2.service_account import ServiceAccountCredentials
 
 # ---------------------------------------------------------
 # 1. PAGE CONFIG & CONNECTIONS
@@ -21,14 +22,46 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Auto-correct escaped newlines if present in secrets
-if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-    pk = st.secrets["connections"]["gsheets"].get("private_key", "")
-    if "\\n" in pk:
-        st.secrets["connections"]["gsheets"]["private_key"] = pk.replace("\\n", "\n")
+class DirectGSheetsConnection:
+    def __init__(self, secrets_dict):
+        scope = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        sec = dict(secrets_dict)
+        pk = sec.get("private_key", "")
+        if "\\n" in pk:
+            pk = pk.replace("\\n", "\n")
+        sec["private_key"] = pk.strip()
+        
+        creds = ServiceAccountCredentials.from_service_account_info(sec, scopes=scope)
+        self.client = gspread.authorize(creds)
+        self.spreadsheet_url = sec.get("spreadsheet")
+        self.sh = self.client.open_by_url(self.spreadsheet_url)
 
-# Initialize Google Sheets connection (reads configuration from secrets)
-conn = st.connection("gsheets", type=GSheetsConnection)
+    def read(self, worksheet: str, ttl=0):
+        try:
+            ws = self.sh.worksheet(worksheet)
+            data = ws.get_all_records()
+            return pd.DataFrame(data)
+        except Exception:
+            return pd.DataFrame()
+
+    def update(self, worksheet: str, data: pd.DataFrame):
+        try:
+            ws = self.sh.worksheet(worksheet)
+        except Exception:
+            ws = self.sh.add_worksheet(title=worksheet, rows=100, cols=20)
+        ws.clear()
+        df_clean = data.fillna("")
+        ws.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
+
+# Initialize robust direct connection
+try:
+    conn = DirectGSheetsConnection(st.secrets["connections"]["gsheets"])
+except Exception as e:
+    st.error(f"Google Sheets connection error: {e}")
+    conn = None
 
 SERIAL_RE = re.compile(r"PER-\d{4}-\d{4}", re.IGNORECASE)
 EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
@@ -98,6 +131,8 @@ def decode_qr(uploaded_file):
 
 def find_registration(serial: str):
     """Check Google Sheets 'registrations' tab for an existing serial."""
+    if not conn:
+        return None
     try:
         df = conn.read(worksheet="registrations", ttl=0)
         if df is not None and not df.empty and "serial" in df.columns:
@@ -112,6 +147,8 @@ def find_registration(serial: str):
 
 def save_registration(serial, email, phone, email_sent):
     """Append a new registration row to the 'registrations' tab in Google Sheets."""
+    if not conn:
+        return
     try:
         df = conn.read(worksheet="registrations", ttl=0)
         new_row = pd.DataFrame([{
@@ -137,6 +174,8 @@ def save_registration(serial, email, phone, email_sent):
 
 def save_vip_email(email):
     """Append a new VIP email row to the 'vip_list' tab in Google Sheets."""
+    if not conn:
+        return False
     try:
         df = conn.read(worksheet="vip_list", ttl=0)
         new_row = pd.DataFrame([{
